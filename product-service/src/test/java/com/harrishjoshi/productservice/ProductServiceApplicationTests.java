@@ -42,7 +42,7 @@ class ProductServiceApplicationTests {
 
     @Test
     void shouldCreateProduct() throws Exception {
-        // delete all previous products if available
+        // delete all previous added products
         productRepository.deleteAll();
 
         var productRequest = getProductRequest();
