@@ -1,5 +1,6 @@
 package com.harrishjoshi.orderservice.service;
 
+import brave.Tracer;
 import com.harrishjoshi.orderservice.dto.InventoryResponse;
 import com.harrishjoshi.orderservice.dto.OrderLineItemsDto;
 import com.harrishjoshi.orderservice.dto.OrderRequest;
@@ -23,6 +24,7 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final WebClient.Builder webClientBuilder;
+    private final Tracer tracer;
 
     public String placeOrder(OrderRequest orderRequest) {
         Order order = new Order();
@@ -38,24 +40,31 @@ public class OrderService {
                 .stream()
                 .map(OrderLineItems::getSkuCode)
                 .toList();
-        var productsInStockArr = webClientBuilder.build().get()
-                .uri(
-                        "http://inventory-service/api/v1/inventory",
-                        uriBuilder -> uriBuilder.queryParam("skuCodes", skuCodes).build()
-                )
-                .retrieve()
-                .bodyToMono(InventoryResponse[].class)
-                .block();
 
-        var allProductsInStock = productsInStockArr != null &&
-                Arrays.stream(productsInStockArr)
-                        .allMatch(InventoryResponse::isInStock);
+        var inventoryServiceLookup = tracer.nextSpan().name("InventoryServiceLookup");
 
-        if (Boolean.TRUE.equals(allProductsInStock)) {
-            orderRepository.save(order);
-            log.info("Order {} is placed successfully.", order.getOrderNumber());
-            return "Order placed successfully.";
-        } else throw new IllegalArgumentException("Product is not in stock, please try again later.");
+        try (Tracer.SpanInScope ignored = tracer.withSpanInScope(inventoryServiceLookup.start())) {
+            var productsInStockArr = webClientBuilder.build().get()
+                    .uri(
+                            "http://inventory-service/api/v1/inventory",
+                            uriBuilder -> uriBuilder.queryParam("skuCodes", skuCodes).build()
+                    )
+                    .retrieve()
+                    .bodyToMono(InventoryResponse[].class)
+                    .block();
+
+            var allProductsInStock = productsInStockArr != null &&
+                    Arrays.stream(productsInStockArr)
+                            .allMatch(InventoryResponse::isInStock);
+
+            if (Boolean.TRUE.equals(allProductsInStock)) {
+                orderRepository.save(order);
+                log.info("Order {} is placed successfully.", order.getOrderNumber());
+                return "Order placed successfully.";
+            } else throw new IllegalArgumentException("Product is not in stock, please try again later.");
+        } finally {
+            inventoryServiceLookup.flush();
+        }
     }
 
     private OrderLineItems mapOrderLineItemsDtoToObject(OrderLineItemsDto orderLineItemsDto) {
