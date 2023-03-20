@@ -10,6 +10,8 @@
     </parent>
 
     <artifactId>api-gateway</artifactId>
+    <name>api-gateway</name>
+    <description>Api Gateway</description>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>

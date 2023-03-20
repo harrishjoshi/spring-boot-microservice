@@ -10,6 +10,8 @@
     </parent>
 
     <artifactId>discovery-server</artifactId>
+    <name>discovery-server</name>
+    <description>Discovery Server</description>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
