@@ -1,0 +1,5 @@
+spring:
+  zipkin:
+    base-url: http://zipkin:9411
+server:
+  port: 8761
